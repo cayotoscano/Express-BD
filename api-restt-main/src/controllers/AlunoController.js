@@ -1,4 +1,5 @@
 import alunoRepository from '../repositories/AlunoRepository.js'
+import alunoService from '../services/AlunoService.js'
 
 class AlunoController {
   async index(req, res) {
@@ -9,6 +10,14 @@ class AlunoController {
 
   async show(req, res) {
     const id = Number(req.params.id)
+
+    try {
+      alunoService.validarId(id)
+    } catch (error) {
+      return res.status(400).json({
+        mensagem: error.message
+      })
+    }
 
     const aluno = await alunoRepository.findById(id)
 
@@ -24,6 +33,14 @@ class AlunoController {
   async store(req, res) {
     const { nome, curso } = req.body
 
+    try {
+      alunoService.validarDados({ nome, curso })
+    } catch (error) {
+      return res.status(400).json({
+        mensagem: error.message
+      })
+    }
+
     const aluno = await alunoRepository.create({
       nome,
       curso
@@ -37,8 +54,16 @@ class AlunoController {
 
   async update(req, res) {
     const id = Number(req.params.id)
-
     const { nome, curso } = req.body
+
+    try {
+      alunoService.validarId(id)
+      alunoService.validarDados({ nome, curso })
+    } catch (error) {
+      return res.status(400).json({
+        mensagem: error.message
+      })
+    }
 
     const aluno = await alunoRepository.update(id, {
       nome,
@@ -56,6 +81,14 @@ class AlunoController {
 
   async delete(req, res) {
     const id = Number(req.params.id)
+
+    try {
+      alunoService.validarId(id)
+    } catch (error) {
+      return res.status(400).json({
+        mensagem: error.message
+      })
+    }
 
     const removido = await alunoRepository.delete(id)
 
