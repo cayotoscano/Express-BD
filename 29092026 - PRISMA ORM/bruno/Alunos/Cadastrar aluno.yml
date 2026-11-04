@@ -1,0 +1,23 @@
+info:
+  name: Cadastrar aluno
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:3000/alunos
+  body:
+    type: json
+    data: |-
+      {
+        "nome": "Luis",
+        "email": "luis@email.com",
+        "cursoId": 3
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

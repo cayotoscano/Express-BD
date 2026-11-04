@@ -1,0 +1,22 @@
+info:
+  name: Cadastrar professor
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:3000/professores
+  body:
+    type: json
+    data: |-
+      {
+        "nome": "Pedro",
+        "disciplinaIds": [2]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

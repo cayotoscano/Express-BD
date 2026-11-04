@@ -1,0 +1,20 @@
+info:
+  name: Atualizar curso
+  type: http
+
+http:
+  method: PATCH
+  url: http://localhost:3000/cursos/1
+  body:
+    type: json
+    data: |-
+      {
+        "nome": "Comunicação"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
