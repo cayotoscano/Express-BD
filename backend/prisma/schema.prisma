@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id      String   @id
+  title   String
+  courses Course[]
+}
+
+model Course {
+  id          Int        @id
+  title       String
+  description String
+  videoId     String
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  favorites   Favorite[]
+
+  @@index([categoryId])
+}
+
+model Favorite {
+  userId    String
+  courseId  Int
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, courseId])
+  @@index([userId])
+}
