@@ -14,4 +14,36 @@ model Category {
   slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  courses   Course[]
+}
+
+model Course {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique
+  description String
+  thumbnail  String?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  lessons     Lesson[]
+
+  @@index([categoryId])
+}
+
+model Lesson {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  videoId     String
+  position    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  courseId    Int
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, position])
+  @@index([courseId])
 }

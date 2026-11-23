@@ -22,10 +22,13 @@ devflix/
 ├── backend/
 │   ├── prisma/
 │   │   ├── migrations/
+│   │   │   ├── 20261123180000_baseline_categories/
+│   │   │   └── 20261123200600_add_courses_lessons/
 │   │   ├── schema.prisma
 │   │   └── seed.ts
 │   ├── src/
 │   │   ├── categories/
+│   │   ├── courses/
 │   │   ├── generated/prisma/   # gerado por `npm run db:generate`
 │   │   ├── health/
 │   │   └── prisma/
@@ -223,3 +226,161 @@ serve localmente essa build.
 ajuste a `DATABASE_URL`, mude `provider` no schema Prisma para `mysql` e use o
 driver adapter apropriado (por exemplo, o adapter MySQL suportado pela versão
 do Prisma adotada). Recrie/aplique as migrações no banco correspondente.
+
+## Tutorial 4 — Cursos e aulas
+
+O schema agora relaciona categorias, cursos e aulas. Cursos pertencem a uma
+categoria (`ON DELETE RESTRICT`), enquanto as aulas pertencem a um curso
+(`ON DELETE CASCADE`). O seed usa `upsert` por slug e pela chave composta
+`courseId_position`, podendo ser executado novamente sem duplicar registros.
+
+Na raiz `devflix/`, suba e confira o PostgreSQL:
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+No backend, valide o schema, aplique a migration incremental e gere o client:
+
+```bash
+cd backend
+npx prisma validate
+npx prisma migrate dev --name add_courses_lessons
+npx prisma generate
+```
+
+Os endpoints `GET /courses` e `GET /courses/:id` incluem categoria e aulas
+ordenadas por posição. Um ID numérico inexistente retorna HTTP 404; um ID que
+não seja número retorna HTTP 400 pelo `ParseIntPipe`.
+
+**Banco anterior sem histórico de migrations:** não apague nem resete o banco.
+Este repositório inclui uma migration baseline para `Category` e outra
+incremental para cursos e aulas. Se a tabela `Category` já existe, mas
+`_prisma_migrations` ainda não existe (por exemplo, foi criada com `db push`),
+marque somente a baseline como aplicada antes do comando incremental:
+
+```bash
+npx prisma migrate resolve --applied 20261123180000_baseline_categories
+npx prisma migrate dev --name add_courses_lessons
+```
+
+Se o banco já tem histórico de migrations, mantenha e use esse histórico
+existente; não marque uma baseline adicional. Antes de rodar, compare os
+diretórios de migrations com `_prisma_migrations`. O `migrate resolve` registra
+o estado atual, não executa a migration baseline, e só deve ser usado depois
+de confirmar que as tabelas `Category` existentes correspondem a ela. As
+migrations adicionam tabelas e relações, sem recriar nem apagar categorias.
+
+Para inspecionar as tabelas no PostgreSQL:
+
+```bash
+docker exec -it devflix-postgres psql -U devflix -d devflix_db
+```
+
+No prompt do `psql`:
+
+```sql
+\dt
+\d "Course"
+\d "Lesson"
+\q
+```
+
+Instale/garanta `tsx` como ferramenta de desenvolvimento e execute o seed duas
+vezes para conferir que ele é idempotente:
+
+```bash
+npm install -D tsx
+npx prisma db seed
+npx prisma db seed
+```
+
+O `prisma.config.ts` registra o seed para `prisma db seed`. O seed mantém as
+três categorias existentes e cria/atualiza os cursos publicados React para
+Iniciantes, Node.js para Iniciantes e Fundamentos de SQL, junto com suas aulas.
+
+O módulo `Courses` está no projeto. Para reproduzir sua geração em um backend
+vazio, estes são os comandos do CLI (não os rode novamente neste projeto):
+
+```bash
+npx nest generate module courses
+npx nest generate controller courses --no-spec
+npx nest generate service courses --no-spec
+```
+
+Inicie a API e teste os resultados esperados:
+
+```bash
+npm run start:dev
+curl -i http://localhost:3000/courses
+curl -i http://localhost:3000/courses/1
+curl -i http://localhost:3000/courses/999999
+curl -i http://localhost:3000/courses/abc
+npm run build
+npm run test
+```
+
+Uma lista vazia antes de executar o seed é possível; após o seed, os três
+cursos devem ser listados. IDs são autoincrementais, então use o ID efetivo
+retornado por `/courses` para consultar um curso específico.
+O teste unitário de `src/courses/courses.service.spec.ts` cobre listagem,
+consulta por ID e curso inexistente com Prisma mockado.
+
+Consultas para executar no `psql`:
+
+```sql
+SELECT c."id", c."title", c."slug", cat."name" AS "category"
+FROM "Course" c
+INNER JOIN "Category" cat ON cat."id" = c."categoryId"
+ORDER BY c."title";
+
+SELECT l."title" AS "lesson", l."position", c."title" AS "course"
+FROM "Lesson" l
+INNER JOIN "Course" c ON c."id" = l."courseId"
+ORDER BY c."title", l."position";
+
+SELECT c."id", c."title", COUNT(l."id") AS "lessonCount"
+FROM "Course" c
+LEFT JOIN "Lesson" l ON l."courseId" = c."id"
+GROUP BY c."id", c."title"
+ORDER BY c."title";
+```
+
+Teste a integridade referencial tentando inserir um curso com categoria
+inexistente; o PostgreSQL deve rejeitar a linha com erro de chave estrangeira
+(SQLSTATE `23503`):
+
+```sql
+INSERT INTO "Course"
+  ("title", "slug", "description", "published", "createdAt", "updatedAt", "categoryId")
+VALUES
+  ('Curso inválido', 'curso-categoria-inexistente', 'Teste de chave estrangeira',
+   false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 999999);
+```
+
+### Problemas comuns no Tutorial 4
+
+- **`P1001: Can't reach database server`:** confirme `docker compose ps`,
+  aguarde o healthcheck e consulte `docker compose logs postgres`.
+- **`P2002`:** violação de valor único; confira slugs duplicados ou uma aula
+  tentando repetir `position` no mesmo curso. O seed resolve os registros por
+  `upsert`; não altere os slugs de forma inconsistente.
+- **`P2003`:** violação de chave estrangeira; use um `categoryId` existente
+  para o curso e um `courseId` existente para a aula.
+- **`Property 'course' does not exist on PrismaService`:** verifique o schema,
+  rode `npx prisma generate` em `backend/` e reinicie o servidor Nest.
+- **`Cannot find module generated/prisma/client.js`:** gere o Prisma Client
+  com `npx prisma generate` e confirme o caminho/output ESM do generator.
+- **Seed não executa:** confirme `backend/.env`, `DATABASE_URL`, a entrada
+  `migrations.seed` em `prisma.config.ts`, a instalação do `tsx` e rode
+  `npx prisma db seed` a partir de `backend/`.
+- **API retorna array vazio:** aplique as migrations, execute
+  `npx prisma db seed` e confirme os dados com `SELECT * FROM "Course";`.
+- **Drift de migration:** pare e investigue diferenças entre o schema,
+  migrations existentes e `_prisma_migrations`; faça backup e corrija a
+  migration/histórico cuidadosamente. Não descarte tabelas para contornar o
+  erro.
+- **Não rode `npx prisma migrate reset` sem investigar antes.** Esse comando
+  apaga os dados do banco; prefira entender o drift e corrigir o histórico sem
+  perda de dados.
