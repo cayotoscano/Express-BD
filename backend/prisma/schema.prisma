@@ -1,36 +1,17 @@
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
 }
 
 model Category {
-  id      String   @id
-  title   String
-  courses Course[]
-}
-
-model Course {
-  id          Int        @id
-  title       String
-  description String
-  videoId     String
-  categoryId  String
-  category    Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  favorites   Favorite[]
-
-  @@index([categoryId])
-}
-
-model Favorite {
-  userId    String
-  courseId  Int
-  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
   createdAt DateTime @default(now())
-
-  @@id([userId, courseId])
-  @@index([userId])
+  updatedAt DateTime @updatedAt
 }
